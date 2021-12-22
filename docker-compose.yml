@@ -1,0 +1,68 @@
+version: '2'
+
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_MS: 120000
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 5000
+  redis:
+    image: redis
+  database:
+    image: postgres:12.7
+    environment: 
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_pass
+      POSTGRES_DB: fiskil_db
+    volumes:
+      - ./scripts:/docker-entrypoint-initdb.d/
+  producer:
+    image: golang:latest
+    restart: on-failure:10
+    volumes:
+      - ./:/usr/src/producer
+    working_dir: /usr/src/producer
+    env_file: .env
+    command: bash -c "cd /usr/src/producer/cmd/producer && go build -o ../../bin/ && ../../bin/producer"
+    depends_on:
+      - app
+  dbquery:
+    image: golang:latest
+    restart: on-failure:10
+    volumes:
+      - ./:/usr/src/dbquery
+    working_dir: /usr/src/dbquery
+    env_file: .env
+    command: bash -c "cd /usr/src/dbquery/cmd/dbquery && go build -o ../../bin/ && ../../bin/dbquery"
+    depends_on:
+      - producer
+  app:
+    image: golang:latest
+    volumes:
+      - ./:/usr/src/fiskil
+    working_dir: /usr/src/fiskil
+    env_file: .env
+    command: bash -c "cd /usr/src/fiskil/cmd/worker && go build -o ../../bin/ && ../../bin/worker"
+    depends_on:
+      - database
+      - redis
+      - zookeeper
+      - kafka
