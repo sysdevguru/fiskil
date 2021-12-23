@@ -34,6 +34,10 @@ docker-compose
 ```sh
 make test
 ```
+- Producer publish logs that contain random severity/service name to the Kafka
+- Application gets that logs and trigger job from worker pool every batch process interval time
+- DB query app queries db every 30 seconds and shows the amount of logs and severities, content of severities
+
 
 ## How to do unittest
 ```sh
